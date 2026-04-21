@@ -30,7 +30,7 @@ try {
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl");
 
-if (!gl) throw new Error("❌ WebGL NOT supported");
+if (!gl) throw new Error("WebGL NOT supported");
 
 msg.innerText = "✅ WebGL OK";
 
@@ -159,7 +159,12 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  const cam=mult(rotY(-car.a),trans(-car.x,-2,-car.z-6));
+  // 🎥 CAMERA ABOVE CAR (FIXED)
+  const cam=mult(
+    rotY(-car.a),
+    trans(-car.x, -8, -car.z)
+  );
+
   const vp=mult(proj,cam);
 
   // ground
