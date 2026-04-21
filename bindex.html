@@ -126,10 +126,6 @@ function rotY(a){
   return [Math.cos(a),0,-Math.sin(a),0,0,1,0,0,Math.sin(a),0,Math.cos(a),0,0,0,0,1];
 }
 
-function rotX(a){
-  return [1,0,0,0,0,Math.cos(a),Math.sin(a),0,0,-Math.sin(a),Math.cos(a),0,0,0,0,1];
-}
-
 // ===== GAME =====
 let car={x:0,z:0,a:0,s:0};
 const keys={};
@@ -163,13 +159,14 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // 🎥 FIXED CAMERA (ABOVE + LOOKING DOWN)
+  // 🎥 CHASE CAMERA (LIKE FIRST VERSION)
+  const camX = car.x - Math.sin(car.a) * 10;
+  const camZ = car.z - Math.cos(car.a) * 10;
+  const camY = -6;
+
   const cam = mult(
     rotY(-car.a),
-    mult(
-      rotX(0.7), // tilt downward
-      trans(-car.x, -8, -car.z - 6)
-    )
+    trans(-camX, camY, -camZ)
   );
 
   const vp=mult(proj,cam);
