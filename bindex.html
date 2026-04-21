@@ -4,82 +4,67 @@
   <title>3D Car Game</title>
   <style>
     body { margin: 0; overflow: hidden; }
+    #error {
+      position: fixed;
+      top: 0;
+      left: 0;
+      color: red;
+      background: white;
+      font-family: monospace;
+      padding: 10px;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
 
-<!-- Three.js (non-module, works locally) -->
+<div id="error"></div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 
 <script>
+try {
+
+if (typeof THREE === "undefined") {
+  throw new Error("Three.js failed to load (no internet or blocked).");
+}
+
 // Scene
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
 // Camera
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 5, 10);
 
 // Renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(innerWidth, innerHeight);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Light
 const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(20, 40, 20);
+light.position.set(10, 20, 10);
 scene.add(light);
 
-// ===== GROUND =====
+// Ground
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(500, 500),
+  new THREE.PlaneGeometry(200, 200),
   new THREE.MeshLambertMaterial({ color: 0x3a9d23 })
 );
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-// ===== ROAD =====
+// Road
 const road = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, 500),
+  new THREE.PlaneGeometry(10, 200),
   new THREE.MeshLambertMaterial({ color: 0x333333 })
 );
 road.rotation.x = -Math.PI / 2;
 road.position.y = 0.01;
 scene.add(road);
 
-// Road lines
-for (let i = -200; i < 200; i += 20) {
-  const line = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 10),
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
-  );
-  line.rotation.x = -Math.PI / 2;
-  line.position.set(0, 0.02, i);
-  scene.add(line);
-}
-
-// ===== BUILDINGS =====
-function createBuilding(x, z) {
-  const height = Math.random() * 10 + 5;
-
-  const building = new THREE.Mesh(
-    new THREE.BoxGeometry(6, height, 6),
-    new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff })
-  );
-
-  building.position.set(x, height / 2, z);
-  scene.add(building);
-}
-
-// Generate city
-for (let i = -100; i <= 100; i += 15) {
-  for (let j = -100; j <= 100; j += 15) {
-    if (Math.abs(i) > 12) {
-      createBuilding(i, j);
-    }
-  }
-}
-
-// ===== CAR =====
+// Car
 const car = new THREE.Mesh(
   new THREE.BoxGeometry(2, 1, 4),
   new THREE.MeshLambertMaterial({ color: 0xff0000 })
@@ -89,17 +74,15 @@ scene.add(car);
 
 // Controls
 const keys = {};
-addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
 let speed = 0;
 let angle = 0;
 
-// Game loop
 function animate() {
   requestAnimationFrame(animate);
 
-  // movement
   if (keys["w"]) speed += 0.01;
   if (keys["s"]) speed -= 0.01;
   speed *= 0.95;
@@ -111,12 +94,9 @@ function animate() {
   car.position.x += Math.sin(angle) * speed * 5;
   car.position.z += Math.cos(angle) * speed * 5;
 
-  // camera
-  camera.position.set(
-    car.position.x - Math.sin(angle) * 10,
-    6,
-    car.position.z - Math.cos(angle) * 10
-  );
+  // camera follow
+  camera.position.x = car.position.x - Math.sin(angle) * 8;
+  camera.position.z = car.position.z - Math.cos(angle) * 8;
   camera.lookAt(car.position);
 
   renderer.render(scene, camera);
@@ -125,11 +105,16 @@ function animate() {
 animate();
 
 // Resize
-addEventListener("resize", () => {
-  camera.aspect = innerWidth/innerHeight;
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+} catch (err) {
+  document.getElementById("error").innerText = err.message;
+  console.error(err);
+}
 </script>
 
 </body>
