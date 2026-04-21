@@ -4,38 +4,19 @@
   <title>3D Car Game</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    #error {
-      position: fixed;
-      top: 0;
-      left: 0;
-      color: red;
-      background: white;
-      font-family: monospace;
-      padding: 10px;
-      z-index: 9999;
-    }
   </style>
 </head>
 <body>
 
-<div id="error"></div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 
 <script>
-try {
-
-if (typeof THREE === "undefined") {
-  throw new Error("Three.js failed to load (no internet or blocked).");
-}
-
 // Scene
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
 // Camera
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0, 5, 10);
 
 // Renderer
 const renderer = new THREE.WebGLRenderer();
@@ -44,59 +25,112 @@ document.body.appendChild(renderer.domElement);
 
 // Light
 const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(10, 20, 10);
+light.position.set(5,10,5);
 scene.add(light);
 
-// Ground
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshLambertMaterial({ color: 0x3a9d23 })
-);
+// ===== GROUND =====
+const groundGeo = new THREE.PlaneGeometry(300, 300);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-// Road
-const road = new THREE.Mesh(
-  new THREE.PlaneGeometry(10, 200),
-  new THREE.MeshLambertMaterial({ color: 0x333333 })
-);
+// ===== ROAD =====
+const roadGeo = new THREE.PlaneGeometry(12, 300);
+const roadMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+const road = new THREE.Mesh(roadGeo, roadMat);
 road.rotation.x = -Math.PI / 2;
 road.position.y = 0.01;
 scene.add(road);
 
-// Car
-const car = new THREE.Mesh(
-  new THREE.BoxGeometry(2, 1, 4),
-  new THREE.MeshLambertMaterial({ color: 0xff0000 })
-);
-car.position.y = 0.5;
+// Road lines
+for (let i = -140; i < 140; i += 20) {
+  const line = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(0, 0.02, i);
+  scene.add(line);
+}
+
+// ===== BUILDINGS =====
+function createBuilding(x, z) {
+  const height = Math.random() * 8 + 4;
+
+  const building = new THREE.Mesh(
+    new THREE.BoxGeometry(6, height, 6),
+    new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff })
+  );
+
+  building.position.set(x, height / 2, z);
+  scene.add(building);
+}
+
+// generate buildings (leave space for road)
+for (let x = -80; x <= 80; x += 12) {
+  for (let z = -120; z <= 120; z += 12) {
+    if (Math.abs(x) > 10) {
+      createBuilding(x, z);
+    }
+  }
+}
+
+// ===== CAR =====
+const car = new THREE.Group();
+
+// Body
+const bodyGeo = new THREE.BoxGeometry(2, 0.5, 4);
+const bodyMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+body.position.y = 0.5;
+car.add(body);
+
+// Wheels
+function createWheel(x, z) {
+  const geo = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 16);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  const wheel = new THREE.Mesh(geo, mat);
+  wheel.rotation.z = Math.PI / 2;
+  wheel.position.set(x, 0.4, z);
+  return wheel;
+}
+
+car.add(createWheel(-1, 1.5));
+car.add(createWheel(1, 1.5));
+car.add(createWheel(-1, -1.5));
+car.add(createWheel(1, -1.5));
+
 scene.add(car);
 
 // Controls
 const keys = {};
-window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+document.addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
 
 let speed = 0;
 let angle = 0;
 
+// Game loop
 function animate() {
   requestAnimationFrame(animate);
 
-  if (keys["w"]) speed += 0.01;
-  if (keys["s"]) speed -= 0.01;
-  speed *= 0.95;
+  if (keys["w"]) speed += 0.002;
+  if (keys["s"]) speed -= 0.002;
+
+  speed *= 0.98;
 
   if (keys["a"]) angle += 0.03;
   if (keys["d"]) angle -= 0.03;
 
   car.rotation.y = angle;
-  car.position.x += Math.sin(angle) * speed * 5;
-  car.position.z += Math.cos(angle) * speed * 5;
+  car.position.x += Math.sin(angle) * speed * 100;
+  car.position.z += Math.cos(angle) * speed * 100;
 
-  // camera follow
-  camera.position.x = car.position.x - Math.sin(angle) * 8;
-  camera.position.z = car.position.z - Math.cos(angle) * 8;
+  // Camera follow
+  camera.position.x = car.position.x - Math.sin(angle) * 10;
+  camera.position.z = car.position.z - Math.cos(angle) * 10;
+  camera.position.y = 6;
   camera.lookAt(car.position);
 
   renderer.render(scene, camera);
@@ -110,11 +144,6 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-} catch (err) {
-  document.getElementById("error").innerText = err.message;
-  console.error(err);
-}
 </script>
 
 </body>
