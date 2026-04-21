@@ -10,7 +10,6 @@
 <canvas id="c"></canvas>
 
 <script>
-// ===== BASIC WEBGL SETUP =====
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl");
 
@@ -22,7 +21,7 @@ function resize() {
 resize();
 addEventListener("resize", resize);
 
-// ===== SIMPLE SHADER =====
+// ===== SHADERS =====
 const vs = `
 attribute vec3 position;
 uniform mat4 matrix;
@@ -30,27 +29,39 @@ void main() {
   gl_Position = matrix * vec4(position, 1.0);
 }`;
 const fs = `
+precision mediump float;
+uniform vec4 color;
 void main() {
-  gl_FragColor = vec4(0.6,0.6,0.6,1);
+  gl_FragColor = color;
 }`;
 
-function createShader(type, source) {
+function shader(type, src){
   const s = gl.createShader(type);
-  gl.shaderSource(s, source);
+  gl.shaderSource(s, src);
   gl.compileShader(s);
   return s;
 }
 
 const program = gl.createProgram();
-gl.attachShader(program, createShader(gl.VERTEX_SHADER, vs));
-gl.attachShader(program, createShader(gl.FRAGMENT_SHADER, fs));
+gl.attachShader(program, shader(gl.VERTEX_SHADER, vs));
+gl.attachShader(program, shader(gl.FRAGMENT_SHADER, fs));
 gl.linkProgram(program);
 gl.useProgram(program);
 
-// ===== CUBE DATA =====
+// ===== CUBE (FULL) =====
 const cube = new Float32Array([
-  -1,-1,-1, 1,-1,-1, 1,1,-1, -1,-1,-1, 1,1,-1, -1,1,-1,
-  -1,-1,1, 1,-1,1, 1,1,1, -1,-1,1, 1,1,1, -1,1,1
+ // front
+ -1,-1,1, 1,-1,1, 1,1,1, -1,-1,1, 1,1,1, -1,1,1,
+ // back
+ -1,-1,-1, -1,1,-1, 1,1,-1, -1,-1,-1, 1,1,-1, 1,-1,-1,
+ // left
+ -1,-1,-1, -1,-1,1, -1,1,1, -1,-1,-1, -1,1,1, -1,1,-1,
+ // right
+ 1,-1,-1, 1,1,-1, 1,1,1, 1,-1,-1, 1,1,1, 1,-1,1,
+ // top
+ -1,1,-1, -1,1,1, 1,1,1, -1,1,-1, 1,1,1, 1,1,-1,
+ // bottom
+ -1,-1,-1, 1,-1,-1, 1,-1,1, -1,-1,-1, 1,-1,1, -1,-1,1
 ]);
 
 const buffer = gl.createBuffer();
@@ -62,10 +73,11 @@ gl.enableVertexAttribArray(posLoc);
 gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
 
 const matrixLoc = gl.getUniformLocation(program, "matrix");
+const colorLoc = gl.getUniformLocation(program, "color");
 
 // ===== MATH =====
-function perspective(fov, aspect, near, far) {
-  const f = 1 / Math.tan(fov / 2);
+function perspective(fov, aspect, near, far){
+  const f = 1/Math.tan(fov/2);
   return [
     f/aspect,0,0,0,
     0,f,0,0,
@@ -87,15 +99,27 @@ function translate(x,y,z){
   return [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
 }
 
+function rotateY(a){
+  return [Math.cos(a),0,-Math.sin(a),0, 0,1,0,0, Math.sin(a),0,Math.cos(a),0, 0,0,0,1];
+}
+
 // ===== GAME =====
 let car = {x:0,z:0,angle:0,speed:0};
 const keys={};
 addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
+gl.enable(gl.DEPTH_TEST);
+
+// ===== DRAW CUBE =====
+function drawCube(matrix, color){
+  gl.uniformMatrix4fv(matrixLoc,false,new Float32Array(matrix));
+  gl.uniform4fv(colorLoc,color);
+  gl.drawArrays(gl.TRIANGLES,0,36);
+}
+
 // ===== LOOP =====
-function draw() {
-  // movement
+function loop(){
   if(keys["w"]) car.speed+=0.01;
   if(keys["s"]) car.speed-=0.01;
   car.speed*=0.95;
@@ -107,23 +131,45 @@ function draw() {
   car.z+=Math.cos(car.angle)*car.speed*2;
 
   gl.clearColor(0.5,0.8,1,1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   const proj = perspective(Math.PI/3, canvas.width/canvas.height, 0.1, 100);
 
-  // draw simple "buildings"
-  for(let i=-5;i<=5;i++){
-    for(let j=5;j<30;j+=5){
-      let m = multiply(proj, translate(i*3 - car.x, -1, j - car.z));
-      gl.uniformMatrix4fv(matrixLoc,false,m);
-      gl.drawArrays(gl.TRIANGLES,0,36);
+  const cam = multiply(
+    rotateY(-car.angle),
+    translate(-car.x, -2, -car.z-5)
+  );
+
+  const vp = multiply(proj, cam);
+
+  // ground
+  let ground = multiply(vp, translate(0,-2,0));
+  drawCube(ground, [0.2,0.6,0.2,1]);
+
+  // road
+  for(let z=0; z<50; z+=5){
+    let road = multiply(vp, translate(0,-1.9,z));
+    drawCube(road, [0.2,0.2,0.2,1]);
+  }
+
+  // buildings
+  for(let x=-5; x<=5; x++){
+    for(let z=10; z<60; z+=10){
+      if(Math.abs(x)>1){
+        let b = multiply(vp, translate(x*3,0,z));
+        drawCube(b, [0.6,0.6,0.6,1]);
+      }
     }
   }
 
-  requestAnimationFrame(draw);
+  // car
+  let carM = multiply(vp, translate(car.x, -1, car.z));
+  drawCube(carM, [1,0,0,1]);
+
+  requestAnimationFrame(loop);
 }
 
-draw();
+loop();
 </script>
 </body>
 </html>
