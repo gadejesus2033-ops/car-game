@@ -18,7 +18,7 @@
 </head>
 <body>
 
-<div id="msg">Starting...</div>
+<div id="msg">Right click + move mouse to rotate camera</div>
 <canvas id="c"></canvas>
 
 <script>
@@ -31,8 +31,6 @@ const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl");
 
 if (!gl) throw new Error("WebGL NOT supported");
-
-msg.innerText = "✅ WebGL OK";
 
 function resize(){
   canvas.width = innerWidth;
@@ -77,7 +75,7 @@ if(!gl.getProgramParameter(program,gl.LINK_STATUS)){
 
 gl.useProgram(program);
 
-// ===== FULL CUBE =====
+// ===== CUBE =====
 const cube = new Float32Array([
 -1,-1,1,1,-1,1,1,1,1,-1,-1,1,1,1,1,-1,1,1,
 -1,-1,-1,-1,1,-1,1,1,-1,-1,-1,-1,1,1,-1,1,-1,-1,
@@ -130,6 +128,28 @@ function rotY(a){
 let car={x:0,z:0,a:0,s:0};
 const keys={};
 
+// ===== CAMERA CONTROL =====
+let camYaw = 0;
+let camPitch = 0.4;
+let isRightMouseDown = false;
+
+addEventListener("mousedown", e => {
+  if (e.button === 2) isRightMouseDown = true;
+});
+addEventListener("mouseup", e => {
+  if (e.button === 2) isRightMouseDown = false;
+});
+addEventListener("contextmenu", e => e.preventDefault());
+
+addEventListener("mousemove", e => {
+  if (isRightMouseDown) {
+    camYaw -= e.movementX * 0.005;
+    camPitch -= e.movementY * 0.005;
+    camPitch = Math.max(0.1, Math.min(1.2, camPitch));
+  }
+});
+
+// controls
 addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
@@ -144,6 +164,7 @@ function drawCube(m,c){
 // ===== LOOP =====
 function loop(){
 
+  // movement
   if(keys["w"]) car.s+=0.01;
   if(keys["s"]) car.s-=0.01;
   car.s*=0.95;
@@ -159,13 +180,15 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // 🎥 CHASE CAMERA (LIKE FIRST VERSION)
-  const camX = car.x - Math.sin(car.a) * 10;
-  const camZ = car.z - Math.cos(car.a) * 10;
-  const camY = -6;
+  // ===== ORBIT CAMERA =====
+  const distance = 12;
+
+  const camX = car.x + Math.sin(camYaw) * distance;
+  const camZ = car.z + Math.cos(camYaw) * distance;
+  const camY = -(Math.sin(camPitch) * distance + 3);
 
   const cam = mult(
-    rotY(-car.a),
+    rotY(-camYaw),
     trans(-camX, camY, -camZ)
   );
 
@@ -197,7 +220,7 @@ function loop(){
 loop();
 
 } catch(e){
-  document.getElementById("msg").innerText = "❌ ERROR: " + e.message;
+  document.getElementById("msg").innerText = "ERROR: " + e.message;
   console.error(e);
 }
 </script>
