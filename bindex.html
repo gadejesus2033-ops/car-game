@@ -18,19 +18,17 @@
 </head>
 <body>
 
-<div id="msg">Right click + move mouse to rotate camera</div>
+<div id="msg">WASD to drive</div>
 <canvas id="c"></canvas>
 
 <script>
-const msg = document.getElementById("msg");
-
-try {
-
-// ===== SETUP =====
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl");
 
-if (!gl) throw new Error("WebGL NOT supported");
+if (!gl) {
+  document.body.innerHTML = "WebGL not supported";
+  throw new Error("WebGL not supported");
+}
 
 function resize(){
   canvas.width = innerWidth;
@@ -58,9 +56,6 @@ function makeShader(type,src){
   const s = gl.createShader(type);
   gl.shaderSource(s,src);
   gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){
-    throw new Error(gl.getShaderInfoLog(s));
-  }
   return s;
 }
 
@@ -68,11 +63,6 @@ const program = gl.createProgram();
 gl.attachShader(program, makeShader(gl.VERTEX_SHADER,vs));
 gl.attachShader(program, makeShader(gl.FRAGMENT_SHADER,fs));
 gl.linkProgram(program);
-
-if(!gl.getProgramParameter(program,gl.LINK_STATUS)){
-  throw new Error(gl.getProgramInfoLog(program));
-}
-
 gl.useProgram(program);
 
 // ===== CUBE =====
@@ -124,32 +114,14 @@ function rotY(a){
   return [Math.cos(a),0,-Math.sin(a),0,0,1,0,0,Math.sin(a),0,Math.cos(a),0,0,0,0,1];
 }
 
+function rotX(a){
+  return [1,0,0,0,0,Math.cos(a),Math.sin(a),0,0,-Math.sin(a),Math.cos(a),0,0,0,0,1];
+}
+
 // ===== GAME =====
 let car={x:0,z:0,a:0,s:0};
 const keys={};
 
-// ===== CAMERA CONTROL =====
-let camYaw = 0;
-let camPitch = 0.4;
-let isRightMouseDown = false;
-
-addEventListener("mousedown", e => {
-  if (e.button === 2) isRightMouseDown = true;
-});
-addEventListener("mouseup", e => {
-  if (e.button === 2) isRightMouseDown = false;
-});
-addEventListener("contextmenu", e => e.preventDefault());
-
-addEventListener("mousemove", e => {
-  if (isRightMouseDown) {
-    camYaw -= e.movementX * 0.005;
-    camPitch -= e.movementY * 0.005;
-    camPitch = Math.max(0.1, Math.min(1.2, camPitch));
-  }
-});
-
-// controls
 addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
@@ -180,16 +152,21 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // ===== ORBIT CAMERA =====
-  const distance = 12;
+  // ===== REAR CAMERA (LIKE YOUR IMAGE) =====
+  const followDist = 5;
+  const height = -3;
+  const tilt = 0.5;
 
-  const camX = car.x + Math.sin(camYaw) * distance;
-  const camZ = car.z + Math.cos(camYaw) * distance;
-  const camY = -(Math.sin(camPitch) * distance + 3);
+  const camX = car.x - Math.sin(car.a) * followDist;
+  const camZ = car.z - Math.cos(car.a) * followDist;
+  const camY = height;
 
   const cam = mult(
-    rotY(-camYaw),
-    trans(-camX, camY, -camZ)
+    rotY(-car.a),
+    mult(
+      rotX(tilt),
+      trans(-camX, camY, -camZ)
+    )
   );
 
   const vp=mult(proj,cam);
@@ -198,13 +175,13 @@ function loop(){
   drawCube(mult(vp,trans(0,-3,0)),[0.2,0.6,0.2,1]);
 
   // road
-  for(let z=0;z<50;z+=4){
+  for(let z=0;z<60;z+=4){
     drawCube(mult(vp,trans(0,-2.5,z)),[0.2,0.2,0.2,1]);
   }
 
   // buildings
-  for(let x=-5;x<=5;x++){
-    for(let z=10;z<60;z+=10){
+  for(let x=-6;x<=6;x++){
+    for(let z=10;z<80;z+=10){
       if(Math.abs(x)>1){
         drawCube(mult(vp,trans(x*3,0,z)),[0.6,0.6,0.6,1]);
       }
@@ -218,11 +195,6 @@ function loop(){
 }
 
 loop();
-
-} catch(e){
-  document.getElementById("msg").innerText = "ERROR: " + e.message;
-  console.error(e);
-}
 </script>
 
 </body>
