@@ -140,6 +140,7 @@ const keys={};
 // ===== CAMERA =====
 let camDistance = 5;
 let camPos = {x:0,y:-3,z:0};
+let camAngle = 0;
 
 addEventListener("wheel", e => {
   camDistance += e.deltaY * 0.01;
@@ -206,20 +207,25 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // ===== SMOOTH CAMERA =====
+  // ===== FIXED SMOOTH CAMERA =====
   const height = -3;
   const tilt = 0.5;
 
-  const targetX = car.x - Math.sin(car.a) * camDistance;
-  const targetZ = car.z - Math.cos(car.a) * camDistance;
+  // smooth rotation
+  camAngle += (car.a - camAngle) * 0.1;
+
+  // target position
+  const targetX = car.x - Math.sin(camAngle) * camDistance;
+  const targetZ = car.z - Math.cos(camAngle) * camDistance;
   const targetY = height;
 
+  // smooth position
   camPos.x += (targetX - camPos.x) * 0.1;
   camPos.y += (targetY - camPos.y) * 0.1;
   camPos.z += (targetZ - camPos.z) * 0.1;
 
   const cam = mult(
-    rotY(-car.a),
+    rotY(-camAngle),
     mult(
       rotX(tilt),
       trans(-camPos.x, camPos.y, -camPos.z)
