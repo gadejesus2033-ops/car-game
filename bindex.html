@@ -4,6 +4,7 @@
   <title>3D Car Game</title>
   <style>
     body { margin:0; overflow:hidden; background:black; }
+
     #msg {
       position:fixed;
       top:0;
@@ -14,14 +15,24 @@
       padding:8px;
       z-index:9999;
     }
+
+    #map {
+      position:fixed;
+      right:10px;
+      top:10px;
+      border:2px solid white;
+      background:black;
+    }
   </style>
 </head>
 <body>
 
 <div id="msg">WASD = drive | Scroll = zoom</div>
 <canvas id="c"></canvas>
+<canvas id="map" width="200" height="200"></canvas>
 
 <script>
+// ===== SETUP =====
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl");
 
@@ -37,6 +48,10 @@ function resize(){
 }
 resize();
 addEventListener("resize", resize);
+
+// ===== MAP =====
+const mapCanvas = document.getElementById("map");
+const mapCtx = mapCanvas.getContext("2d");
 
 // ===== SHADERS =====
 const vs = `
@@ -142,6 +157,42 @@ function drawCube(m,c){
   gl.drawArrays(gl.TRIANGLES,0,36);
 }
 
+// ===== MINI MAP =====
+function drawMap() {
+  const scale = 4;
+
+  mapCtx.clearRect(0,0,200,200);
+
+  const offsetX = 100 - car.x * scale;
+  const offsetY = 100 - car.z * scale;
+
+  // road
+  mapCtx.fillStyle = "gray";
+  for(let z=0;z<60;z+=4){
+    let x = offsetX;
+    let y = z * scale + offsetY;
+    mapCtx.fillRect(x-5, y-2, 10, 4);
+  }
+
+  // buildings
+  mapCtx.fillStyle = "white";
+  for(let x=-6;x<=6;x++){
+    for(let z=10;z<80;z+=10){
+      if(Math.abs(x)>1){
+        let mx = x*3 * scale + offsetX;
+        let my = z * scale + offsetY;
+        mapCtx.fillRect(mx-3, my-3, 6, 6);
+      }
+    }
+  }
+
+  // car
+  mapCtx.fillStyle = "red";
+  mapCtx.beginPath();
+  mapCtx.arc(100,100,4,0,Math.PI*2);
+  mapCtx.fill();
+}
+
 // ===== LOOP =====
 function loop(){
 
@@ -161,7 +212,7 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // ===== REAR CAMERA WITH ZOOM =====
+  // ===== CAMERA =====
   const height = -3;
   const tilt = 0.5;
 
@@ -198,6 +249,8 @@ function loop(){
 
   // car
   drawCube(mult(vp,trans(car.x,-2,car.z)),[1,0,0,1]);
+
+  drawMap();
 
   requestAnimationFrame(loop);
 }
