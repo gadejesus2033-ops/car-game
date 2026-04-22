@@ -137,8 +137,9 @@ function rotX(a){
 let car={x:0,z:0,a:0,s:0};
 const keys={};
 
-// ===== CAMERA ZOOM =====
+// ===== CAMERA =====
 let camDistance = 5;
+let camPos = {x:0,y:-3,z:0};
 
 addEventListener("wheel", e => {
   camDistance += e.deltaY * 0.01;
@@ -166,27 +167,20 @@ function drawMap() {
   const offsetX = 100 - car.x * scale;
   const offsetY = 100 - car.z * scale;
 
-  // road
   mapCtx.fillStyle = "gray";
   for(let z=0;z<60;z+=4){
-    let x = offsetX;
-    let y = z * scale + offsetY;
-    mapCtx.fillRect(x-5, y-2, 10, 4);
+    mapCtx.fillRect(offsetX-5, z*scale+offsetY-2, 10, 4);
   }
 
-  // buildings
   mapCtx.fillStyle = "white";
   for(let x=-6;x<=6;x++){
     for(let z=10;z<80;z+=10){
       if(Math.abs(x)>1){
-        let mx = x*3 * scale + offsetX;
-        let my = z * scale + offsetY;
-        mapCtx.fillRect(mx-3, my-3, 6, 6);
+        mapCtx.fillRect(x*3*scale+offsetX-3, z*scale+offsetY-3, 6, 6);
       }
     }
   }
 
-  // car
   mapCtx.fillStyle = "red";
   mapCtx.beginPath();
   mapCtx.arc(100,100,4,0,Math.PI*2);
@@ -212,19 +206,23 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // ===== CAMERA =====
+  // ===== SMOOTH CAMERA =====
   const height = -3;
   const tilt = 0.5;
 
-  const camX = car.x - Math.sin(car.a) * camDistance;
-  const camZ = car.z - Math.cos(car.a) * camDistance;
-  const camY = height;
+  const targetX = car.x - Math.sin(car.a) * camDistance;
+  const targetZ = car.z - Math.cos(car.a) * camDistance;
+  const targetY = height;
+
+  camPos.x += (targetX - camPos.x) * 0.1;
+  camPos.y += (targetY - camPos.y) * 0.1;
+  camPos.z += (targetZ - camPos.z) * 0.1;
 
   const cam = mult(
     rotY(-car.a),
     mult(
       rotX(tilt),
-      trans(-camX, camY, -camZ)
+      trans(-camPos.x, camPos.y, -camPos.z)
     )
   );
 
