@@ -3,185 +3,128 @@
 <head>
   <title>3D Car Game</title>
   <style>
-    body { margin:0; overflow:hidden; background:black; }
-
-    #msg {
-      position:fixed;
-      top:0;
-      left:0;
-      color:white;
-      background:rgba(0,0,0,0.7);
-      font-family:monospace;
-      padding:8px;
-      z-index:9999;
-    }
+    body { margin:0; overflow:hidden; }
 
     #map {
       position:fixed;
-      right:10px;
       top:10px;
-      border:2px solid white;
+      right:10px;
+      width:200px;
+      height:200px;
       background:black;
+      border:2px solid white;
     }
   </style>
 </head>
 <body>
 
-<div id="msg">WASD = drive | Scroll = zoom</div>
-<canvas id="c"></canvas>
-<canvas id="map" width="200" height="200"></canvas>
+<canvas id="map"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 
 <script>
-// ===== SETUP =====
-const canvas = document.getElementById("c");
-const gl = canvas.getContext("webgl");
+// ===== SCENE =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
 
-if (!gl) {
-  document.body.innerHTML = "WebGL not supported";
-  throw new Error("WebGL not supported");
+// ===== CAMERA =====
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+
+// ===== RENDERER =====
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// ===== LIGHT =====
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5,10,5);
+scene.add(light);
+
+// ===== GROUND =====
+const ground = new THREE.Mesh(
+  new THREE.BoxGeometry(200,1,200),
+  new THREE.MeshLambertMaterial({color:0x339933})
+);
+ground.position.y = -3;
+scene.add(ground);
+
+// ===== ROAD =====
+for(let z=0; z<80; z+=4){
+  const road = new THREE.Mesh(
+    new THREE.BoxGeometry(4,0.1,3),
+    new THREE.MeshBasicMaterial({color:0x333333})
+  );
+  road.position.set(0,-2.5,z);
+  scene.add(road);
 }
 
-function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-  gl.viewport(0,0,canvas.width,canvas.height);
+// ===== BUILDINGS =====
+const buildings = [];
+for(let x=-6;x<=6;x++){
+  for(let z=10;z<100;z+=10){
+    if(Math.abs(x)>1){
+      const b = new THREE.Mesh(
+        new THREE.BoxGeometry(2,4,2),
+        new THREE.MeshLambertMaterial({color:0x888888})
+      );
+      b.position.set(x*3,0,z);
+      scene.add(b);
+      buildings.push(b);
+    }
+  }
 }
-resize();
-addEventListener("resize", resize);
 
-// ===== MAP =====
+// ===== CAR =====
+const car = new THREE.Mesh(
+  new THREE.BoxGeometry(1,1,2),
+  new THREE.MeshLambertMaterial({color:0xff0000})
+);
+car.position.y = -2;
+scene.add(car);
+
+// ===== CONTROLS =====
+let speed = 0;
+let angle = 0;
+let camDistance = 8;
+
+const keys = {};
+addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
+addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
+
+// zoom
+addEventListener("wheel", e=>{
+  camDistance += e.deltaY * 0.01;
+  camDistance = Math.max(4, Math.min(20, camDistance));
+});
+
+// ===== MINIMAP =====
 const mapCanvas = document.getElementById("map");
 const mapCtx = mapCanvas.getContext("2d");
 
-// ===== SHADERS =====
-const vs = `
-attribute vec3 position;
-uniform mat4 matrix;
-void main(){
-  gl_Position = matrix * vec4(position,1.0);
-}`;
-const fs = `
-precision mediump float;
-uniform vec4 color;
-void main(){
-  gl_FragColor = color;
-}`;
-
-function makeShader(type,src){
-  const s = gl.createShader(type);
-  gl.shaderSource(s,src);
-  gl.compileShader(s);
-  return s;
-}
-
-const program = gl.createProgram();
-gl.attachShader(program, makeShader(gl.VERTEX_SHADER,vs));
-gl.attachShader(program, makeShader(gl.FRAGMENT_SHADER,fs));
-gl.linkProgram(program);
-gl.useProgram(program);
-
-// ===== CUBE =====
-const cube = new Float32Array([
--1,-1,1,1,-1,1,1,1,1,-1,-1,1,1,1,1,-1,1,1,
--1,-1,-1,-1,1,-1,1,1,-1,-1,-1,-1,1,1,-1,1,-1,-1,
--1,-1,-1,-1,-1,1,-1,1,1,-1,-1,-1,-1,1,1,-1,1,-1,
-1,-1,-1,1,1,-1,1,1,1,1,-1,-1,1,1,1,1,-1,1,
--1,1,-1,-1,1,1,1,1,1,-1,1,-1,1,1,1,1,1,-1,
--1,-1,-1,1,-1,-1,1,-1,1,-1,-1,-1,1,-1,1,-1,-1,1
-]);
-
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER,buf);
-gl.bufferData(gl.ARRAY_BUFFER,cube,gl.STATIC_DRAW);
-
-const pos = gl.getAttribLocation(program,"position");
-gl.enableVertexAttribArray(pos);
-gl.vertexAttribPointer(pos,3,gl.FLOAT,false,0,0);
-
-const matrixLoc = gl.getUniformLocation(program,"matrix");
-const colorLoc = gl.getUniformLocation(program,"color");
-
-// ===== MATH =====
-function perspective(fov,a,n,f){
-  const t=Math.tan(fov/2);
-  return [
-    1/(a*t),0,0,0,
-    0,1/t,0,0,
-    0,0,(n+f)/(n-f),-1,
-    0,0,(2*n*f)/(n-f),0
-  ];
-}
-
-function mult(a,b){
-  let r=new Array(16).fill(0);
-  for(let i=0;i<4;i++)
-    for(let j=0;j<4;j++)
-      for(let k=0;k<4;k++)
-        r[i*4+j]+=a[i*4+k]*b[k*4+j];
-  return r;
-}
-
-function trans(x,y,z){
-  return [1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];
-}
-
-function rotY(a){
-  return [Math.cos(a),0,-Math.sin(a),0,0,1,0,0,Math.sin(a),0,Math.cos(a),0,0,0,0,1];
-}
-
-function rotX(a){
-  return [1,0,0,0,0,Math.cos(a),Math.sin(a),0,0,-Math.sin(a),Math.cos(a),0,0,0,0,1];
-}
-
-// ===== GAME =====
-let car={x:0,z:0,a:0,s:0};
-const keys={};
-
-// ===== CAMERA =====
-let camDistance = 5;
-let camPos = {x:0,y:-3,z:0};
-let camAngle = 0;
-
-addEventListener("wheel", e => {
-  camDistance += e.deltaY * 0.01;
-  camDistance = Math.max(2, Math.min(15, camDistance));
-});
-
-// controls
-addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
-addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-
-gl.enable(gl.DEPTH_TEST);
-
-function drawCube(m,c){
-  gl.uniformMatrix4fv(matrixLoc,false,new Float32Array(m));
-  gl.uniform4fv(colorLoc,c);
-  gl.drawArrays(gl.TRIANGLES,0,36);
-}
-
-// ===== MINI MAP =====
-function drawMap() {
-  const scale = 4;
-
+function drawMap(){
   mapCtx.clearRect(0,0,200,200);
 
-  const offsetX = 100 - car.x * scale;
-  const offsetY = 100 - car.z * scale;
+  const scale = 2;
+  const offsetX = 100 - car.position.x * scale;
+  const offsetY = 100 - car.position.z * scale;
 
+  // road
   mapCtx.fillStyle = "gray";
-  for(let z=0;z<60;z+=4){
-    mapCtx.fillRect(offsetX-5, z*scale+offsetY-2, 10, 4);
+  for(let z=0;z<80;z+=4){
+    mapCtx.fillRect(offsetX-4, z*scale+offsetY-2, 8, 4);
   }
 
+  // buildings
   mapCtx.fillStyle = "white";
-  for(let x=-6;x<=6;x++){
-    for(let z=10;z<80;z+=10){
-      if(Math.abs(x)>1){
-        mapCtx.fillRect(x*3*scale+offsetX-3, z*scale+offsetY-3, 6, 6);
-      }
-    }
-  }
+  buildings.forEach(b=>{
+    mapCtx.fillRect(
+      b.position.x*scale+offsetX-3,
+      b.position.z*scale+offsetY-3,
+      6,6
+    );
+  });
 
+  // car
   mapCtx.fillStyle = "red";
   mapCtx.beginPath();
   mapCtx.arc(100,100,4,0,Math.PI*2);
@@ -189,77 +132,41 @@ function drawMap() {
 }
 
 // ===== LOOP =====
-function loop(){
+function animate(){
 
   // movement
-  if(keys["w"]) car.s+=0.01;
-  if(keys["s"]) car.s-=0.01;
-  car.s*=0.95;
+  if(keys["w"]) speed += 0.02;
+  if(keys["s"]) speed -= 0.02;
+  speed *= 0.95;
 
-  if(keys["a"]) car.a+=0.03;
-  if(keys["d"]) car.a-=0.03;
+  if(keys["a"]) angle += 0.03;
+  if(keys["d"]) angle -= 0.03;
 
-  car.x+=Math.sin(car.a)*car.s*2;
-  car.z+=Math.cos(car.a)*car.s*2;
+  car.position.x += Math.sin(angle) * speed * 2;
+  car.position.z += Math.cos(angle) * speed * 2;
+  car.rotation.y = -angle;
 
-  gl.clearColor(0.5,0.8,1,1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // ✅ YOUR CAMERA (PERFECT)
+  camera.position.x = car.position.x - Math.sin(angle) * camDistance;
+  camera.position.z = car.position.z - Math.cos(angle) * camDistance;
+  camera.position.y = 5;
 
-  const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
-
-  // ===== FIXED SMOOTH CAMERA =====
-  const height = -3;
-  const tilt = 0.5;
-
-  // smooth rotation
-  camAngle += (car.a - camAngle) * 0.1;
-
-  // target position
-  const targetX = car.x - Math.sin(camAngle) * camDistance;
-  const targetZ = car.z - Math.cos(camAngle) * camDistance;
-  const targetY = height;
-
-  // smooth position
-  camPos.x += (targetX - camPos.x) * 0.1;
-  camPos.y += (targetY - camPos.y) * 0.1;
-  camPos.z += (targetZ - camPos.z) * 0.1;
-
-  const cam = mult(
-    rotY(-camAngle),
-    mult(
-      rotX(tilt),
-      trans(-camPos.x, camPos.y, -camPos.z)
-    )
-  );
-
-  const vp=mult(proj,cam);
-
-  // ground
-  drawCube(mult(vp,trans(0,-3,0)),[0.2,0.6,0.2,1]);
-
-  // road
-  for(let z=0;z<60;z+=4){
-    drawCube(mult(vp,trans(0,-2.5,z)),[0.2,0.2,0.2,1]);
-  }
-
-  // buildings
-  for(let x=-6;x<=6;x++){
-    for(let z=10;z<80;z+=10){
-      if(Math.abs(x)>1){
-        drawCube(mult(vp,trans(x*3,0,z)),[0.6,0.6,0.6,1]);
-      }
-    }
-  }
-
-  // car
-  drawCube(mult(vp,trans(car.x,-2,car.z)),[1,0,0,1]);
+  camera.lookAt(car.position);
 
   drawMap();
 
-  requestAnimationFrame(loop);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
 }
 
-loop();
+animate();
+
+// resize
+addEventListener("resize", ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
 </script>
 
 </body>
