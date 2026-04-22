@@ -59,15 +59,18 @@ scene.add(car);
 // ===== CONTROLS =====
 let speed = 0;
 let angle = 0;
-let camDistance = 8;
+
+// ✅ START ZOOMED OUT
+let camDistance = 15;
 
 const keys = {};
 addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
+// zoom
 addEventListener("wheel", e=>{
   camDistance += e.deltaY * 0.01;
-  camDistance = Math.max(4, Math.min(20, camDistance));
+  camDistance = Math.max(4, Math.min(30, camDistance));
 });
 
 // ===== CITY =====
@@ -87,7 +90,6 @@ for(let gx=-CITY_SIZE; gx<=CITY_SIZE; gx++){
     const x = gx * BLOCK_SIZE;
     const z = gz * BLOCK_SIZE;
 
-    // roads
     if(gx % 3 === 0){
       const r = new THREE.Mesh(
         new THREE.BoxGeometry(ROAD_WIDTH,0.1,BLOCK_SIZE),
@@ -108,7 +110,6 @@ for(let gx=-CITY_SIZE; gx<=CITY_SIZE; gx++){
       roads.push(r);
     }
 
-    // buildings
     if(gx % 3 !== 0 && gz % 3 !== 0){
       const h = Math.random()*6 + 2;
 
@@ -162,7 +163,6 @@ function drawMap(){
 // ===== LOOP =====
 function animate(){
 
-  // movement
   if(keys["w"]) speed += 0.02;
   if(keys["s"]) speed -= 0.02;
   speed *= 0.95;
@@ -174,13 +174,12 @@ function animate(){
   car.position.z += Math.cos(angle) * speed * 2;
   car.rotation.y = -angle;
 
-  // camera (your system)
   camera.position.x = car.position.x - Math.sin(angle) * camDistance;
   camera.position.z = car.position.z - Math.cos(angle) * camDistance;
   camera.position.y = 5;
+
   camera.lookAt(car.position);
 
-  // infinite city
   const range = CITY_SIZE * BLOCK_SIZE;
 
   [...buildings, ...roads].forEach(obj=>{
@@ -198,7 +197,6 @@ function animate(){
 
 animate();
 
-// resize
 addEventListener("resize", ()=>{
   camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
