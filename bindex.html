@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>3D Car Game</title>
+  <title>Big City Car Game</title>
   <style>
     body { margin:0; overflow:hidden; }
 
@@ -28,7 +28,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
 // ===== CAMERA =====
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 2000);
 
 // ===== RENDERER =====
 const renderer = new THREE.WebGLRenderer();
@@ -37,42 +37,16 @@ document.body.appendChild(renderer.domElement);
 
 // ===== LIGHT =====
 const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5,10,5);
+light.position.set(10,20,10);
 scene.add(light);
 
 // ===== GROUND =====
 const ground = new THREE.Mesh(
-  new THREE.BoxGeometry(200,1,200),
+  new THREE.BoxGeometry(5000,1,5000),
   new THREE.MeshLambertMaterial({color:0x339933})
 );
 ground.position.y = -3;
 scene.add(ground);
-
-// ===== ROAD =====
-for(let z=0; z<80; z+=4){
-  const road = new THREE.Mesh(
-    new THREE.BoxGeometry(4,0.1,3),
-    new THREE.MeshBasicMaterial({color:0x333333})
-  );
-  road.position.set(0,-2.5,z);
-  scene.add(road);
-}
-
-// ===== BUILDINGS =====
-const buildings = [];
-for(let x=-6;x<=6;x++){
-  for(let z=10;z<100;z+=10){
-    if(Math.abs(x)>1){
-      const b = new THREE.Mesh(
-        new THREE.BoxGeometry(2,4,2),
-        new THREE.MeshLambertMaterial({color:0x888888})
-      );
-      b.position.set(x*3,0,z);
-      scene.add(b);
-      buildings.push(b);
-    }
-  }
-}
 
 // ===== CAR =====
 const car = new THREE.Mesh(
@@ -91,11 +65,64 @@ const keys = {};
 addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
-// zoom
 addEventListener("wheel", e=>{
   camDistance += e.deltaY * 0.01;
   camDistance = Math.max(4, Math.min(20, camDistance));
 });
+
+// ===== CITY =====
+const CITY_SIZE = 20;
+const BLOCK_SIZE = 20;
+const ROAD_WIDTH = 6;
+
+const buildings = [];
+const roads = [];
+
+const roadMat = new THREE.MeshBasicMaterial({color:0x333333});
+const bMat = new THREE.MeshLambertMaterial({color:0x888888});
+
+for(let gx=-CITY_SIZE; gx<=CITY_SIZE; gx++){
+  for(let gz=-CITY_SIZE; gz<=CITY_SIZE; gz++){
+
+    const x = gx * BLOCK_SIZE;
+    const z = gz * BLOCK_SIZE;
+
+    // roads
+    if(gx % 3 === 0){
+      const r = new THREE.Mesh(
+        new THREE.BoxGeometry(ROAD_WIDTH,0.1,BLOCK_SIZE),
+        roadMat
+      );
+      r.position.set(x,-2.5,z);
+      scene.add(r);
+      roads.push(r);
+    }
+
+    if(gz % 3 === 0){
+      const r = new THREE.Mesh(
+        new THREE.BoxGeometry(BLOCK_SIZE,0.1,ROAD_WIDTH),
+        roadMat
+      );
+      r.position.set(x,-2.5,z);
+      scene.add(r);
+      roads.push(r);
+    }
+
+    // buildings
+    if(gx % 3 !== 0 && gz % 3 !== 0){
+      const h = Math.random()*6 + 2;
+
+      const b = new THREE.Mesh(
+        new THREE.BoxGeometry(4,h,4),
+        bMat
+      );
+
+      b.position.set(x, h/2 - 2, z);
+      scene.add(b);
+      buildings.push(b);
+    }
+  }
+}
 
 // ===== MINIMAP =====
 const mapCanvas = document.getElementById("map");
@@ -104,27 +131,28 @@ const mapCtx = mapCanvas.getContext("2d");
 function drawMap(){
   mapCtx.clearRect(0,0,200,200);
 
-  const scale = 2;
+  const scale = 1;
   const offsetX = 100 - car.position.x * scale;
   const offsetY = 100 - car.position.z * scale;
 
-  // road
   mapCtx.fillStyle = "gray";
-  for(let z=0;z<80;z+=4){
-    mapCtx.fillRect(offsetX-4, z*scale+offsetY-2, 8, 4);
-  }
-
-  // buildings
-  mapCtx.fillStyle = "white";
-  buildings.forEach(b=>{
+  roads.forEach(r=>{
     mapCtx.fillRect(
-      b.position.x*scale+offsetX-3,
-      b.position.z*scale+offsetY-3,
-      6,6
+      r.position.x*scale + offsetX - 2,
+      r.position.z*scale + offsetY - 2,
+      4,4
     );
   });
 
-  // car
+  mapCtx.fillStyle = "white";
+  buildings.forEach(b=>{
+    mapCtx.fillRect(
+      b.position.x*scale + offsetX - 2,
+      b.position.z*scale + offsetY - 2,
+      4,4
+    );
+  });
+
   mapCtx.fillStyle = "red";
   mapCtx.beginPath();
   mapCtx.arc(100,100,4,0,Math.PI*2);
@@ -146,12 +174,21 @@ function animate(){
   car.position.z += Math.cos(angle) * speed * 2;
   car.rotation.y = -angle;
 
-  // ✅ YOUR CAMERA (PERFECT)
+  // camera (your system)
   camera.position.x = car.position.x - Math.sin(angle) * camDistance;
   camera.position.z = car.position.z - Math.cos(angle) * camDistance;
   camera.position.y = 5;
-
   camera.lookAt(car.position);
+
+  // infinite city
+  const range = CITY_SIZE * BLOCK_SIZE;
+
+  [...buildings, ...roads].forEach(obj=>{
+    if(obj.position.x - car.position.x > range) obj.position.x -= range*2;
+    if(obj.position.x - car.position.x < -range) obj.position.x += range*2;
+    if(obj.position.z - car.position.z > range) obj.position.z -= range*2;
+    if(obj.position.z - car.position.z < -range) obj.position.z += range*2;
+  });
 
   drawMap();
 
