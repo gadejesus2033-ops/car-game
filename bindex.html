@@ -18,7 +18,7 @@
 </head>
 <body>
 
-<div id="msg">WASD to drive</div>
+<div id="msg">WASD = drive | Scroll = zoom</div>
 <canvas id="c"></canvas>
 
 <script>
@@ -122,6 +122,15 @@ function rotX(a){
 let car={x:0,z:0,a:0,s:0};
 const keys={};
 
+// ===== CAMERA ZOOM =====
+let camDistance = 5;
+
+addEventListener("wheel", e => {
+  camDistance += e.deltaY * 0.01;
+  camDistance = Math.max(2, Math.min(15, camDistance));
+});
+
+// controls
 addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
@@ -152,13 +161,12 @@ function loop(){
 
   const proj=perspective(Math.PI/3,canvas.width/canvas.height,0.1,100);
 
-  // ===== REAR CAMERA (LIKE YOUR IMAGE) =====
-  const followDist = 5;
+  // ===== REAR CAMERA WITH ZOOM =====
   const height = -3;
   const tilt = 0.5;
 
-  const camX = car.x - Math.sin(car.a) * followDist;
-  const camZ = car.z - Math.cos(car.a) * followDist;
+  const camX = car.x - Math.sin(car.a) * camDistance;
+  const camZ = car.z - Math.cos(car.a) * camDistance;
   const camY = height;
 
   const cam = mult(
